@@ -931,6 +931,16 @@ async function processarCurriculo(){
         ]}]
       })
     });
+    if(!response.ok){
+      const errInfo = getApiErrorMsg(response.status);
+      document.getElementById('step-4').innerHTML=`<div class="onb-reading">
+        <div class="onb-reading-title" style="color:var(--red)">${errInfo.title}</div>
+        <div class="onb-reading-sub">${errInfo.msg}${errInfo.links ? '<br><br>'+errInfo.links : ''}</div>
+        ${errInfo.action ? `<button class="onb-btn" onclick="${errInfo.action}" style="margin-top:16px;background:var(--accent2);">Configurar chave</button>` : ''}
+        <button class="onb-btn" onclick="location.reload()" style="margin-top:${errInfo.action ? '8px' : '20px'};background:var(--bg3);color:var(--text2);border:0.5px solid var(--border);">Tentar novamente</button>
+      </div>`;
+      return;
+    }
     const data=await response.json();
     cvText=data.content?.filter(i=>i.type==='text').map(i=>i.text).join('\n')||'';
     CURRICULO=`Profissional: ${USER_NAME}\nÁrea: ${USER_AREA}\n\n${cvText}`;
@@ -941,12 +951,12 @@ async function processarCurriculo(){
     localStorage.setItem('jtp-apikey',API_KEY);
     setTimeout(()=>iniciarApp(),800);
   }catch(e){
-    statusEl.textContent='Erro ao processar. Verifique sua chave de API e tente novamente.';
+    const msg = e.message||'Erro desconhecido';
     document.getElementById('step-4').innerHTML=`<div class="onb-reading">
-      <div class="onb-reading-title" style="color:var(--red)">Erro ao processar</div>
-      <div class="onb-reading-sub">Verifique se sua chave da API Anthropic está correta e possui créditos disponíveis.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2);">Verificar chave ↗</a> &nbsp;·&nbsp; <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent2);">Ver créditos ↗</a></div>
+      <div class="onb-reading-title" style="color:var(--red)">⚠ Erro ao processar</div>
+      <div class="onb-reading-sub">Verifique sua conexão e tente novamente.<br><small style="color:var(--text3);">${msg}</small></div>
       <button class="onb-btn" onclick="location.reload()" style="margin-top:20px;">Tentar novamente</button>
-    </div>`; 
+    </div>`;
   }
 }
 
@@ -1194,6 +1204,50 @@ function setStep(n,status){
   }
 }
 
+
+// ── API ERROR HANDLER ─────────────────────────────────────────
+function getApiErrorMsg(status){
+  switch(status){
+    case 401:
+      return {
+        title: '🔑 Chave inválida ou expirada',
+        msg: 'Sua chave da API foi rejeitada. Verifique se está correta ou crie uma nova.',
+        links: '<a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2);">Verificar chave ↗</a>',
+        action: 'openApiKeyModal()'
+      };
+    case 402:
+    case 529:
+      return {
+        title: '💳 Créditos insuficientes',
+        msg: 'Sua conta Anthropic não tem créditos disponíveis. Você precisa recarregar para continuar usando a IA.',
+        links: '<a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent2);">Adicionar créditos ↗</a> &nbsp;·&nbsp; <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent2);">Ver consumo ↗</a>',
+        action: null
+      };
+    case 429:
+      return {
+        title: '⏳ Limite de requisições atingido',
+        msg: 'Você enviou muitas requisições em pouco tempo. Aguarde alguns segundos e tente novamente.',
+        links: '',
+        action: null
+      };
+    case 500:
+    case 529:
+      return {
+        title: '⚠ Serviço temporariamente indisponível',
+        msg: 'A API da Anthropic está com instabilidade. Tente novamente em alguns minutos.',
+        links: '<a href="https://status.anthropic.com" target="_blank" style="color:var(--accent2);">Ver status da Anthropic ↗</a>',
+        action: null
+      };
+    default:
+      return {
+        title: `Erro ${status}`,
+        msg: 'Ocorreu um erro inesperado. Verifique sua chave e créditos.',
+        links: '<a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent2);">Ver conta ↗</a>',
+        action: null
+      };
+  }
+}
+
 function showErro(msg){
   document.getElementById('progress-block').style.display='none';
   document.getElementById('erro-block').style.display='block';
@@ -1222,7 +1276,12 @@ async function validarVaga(){
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:`CURRÍCULO:\n${CURRICULO}\n\nVAGA:\n${texto}\n\n${prompt}`}]})
       });
     }catch(fe){setStep(3,'error');showErro('Sem conexão. Verifique sua internet.');btn.disabled=false;btn.textContent='Analisar vaga →';return;}
-    if(!response.ok){setStep(3,'error');showErro(`Erro ${response.status}. Verifique sua chave de API.`);btn.disabled=false;btn.textContent='Analisar vaga →';return;}
+    if(!response.ok){
+      const errInfo = getApiErrorMsg(response.status);
+      setStep(3,'error');
+      showErro(`<strong>${errInfo.title}</strong><br><span style="font-weight:400;font-size:12px;">${errInfo.msg}</span>${errInfo.links ? '<br><br>'+errInfo.links : ''}${errInfo.action ? `<br><br><button onclick="${errInfo.action}" style="margin-top:4px;padding:7px 14px;background:var(--accent2);border:none;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Configurar chave</button>` : ''}`);
+      btn.disabled=false;btn.textContent='Analisar vaga →';return;
+    }
     setStep(4);
     const data=await response.json();
     const raw=data.content?.filter(i=>i.type==='text').map(i=>i.text).join('')||'';
