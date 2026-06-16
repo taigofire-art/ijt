@@ -469,6 +469,31 @@ select.onb-input option{background:var(--bg2);}
 </div>
 
 
+<!-- API KEY MODAL -->
+<div id="apikey-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);">
+  <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-xl);padding:28px;width:90%;max-width:420px;">
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;">🔑 Chave da API Anthropic</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.6;">Sua chave fica salva apenas no seu navegador. Nunca é enviada para o criador do IJT. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2);">Obter chave ↗</a></div>
+
+    <div style="position:relative;">
+      <input id="modal-apikey" type="password" placeholder="sk-ant-..." style="width:100%;padding:12px 44px 12px 14px;font-size:16px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-lg);color:var(--text);font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;">
+      <button onclick="toggleApiKeyVisibility()" id="toggle-apikey-btn" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text2);padding:0;" title="Mostrar/ocultar chave">👁</button>
+    </div>
+
+    <div id="apikey-modal-status" style="font-size:11px;margin-top:8px;min-height:16px;"></div>
+
+    <div style="margin-top:8px;padding:10px 12px;background:rgba(252,211,77,0.07);border:0.5px solid rgba(252,211,77,0.25);border-radius:var(--radius);font-size:11px;color:rgba(252,211,77,0.75);line-height:1.5;">
+      ⚡ Cada análise de vaga consome créditos da sua conta Anthropic. <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:rgba(252,211,77,0.9);">Ver consumo ↗</a>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:20px;">
+      <button onclick="saveApiKey()" style="flex:1;padding:12px;background:var(--accent2);border:none;border-radius:var(--radius);color:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Salvar chave</button>
+      <button onclick="closeApiKeyModal()" style="flex:1;padding:12px;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">Cancelar</button>
+    </div>
+    <button onclick="clearApiKey()" style="width:100%;margin-top:8px;padding:8px;background:transparent;border:none;color:var(--red);font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">Remover chave salva</button>
+  </div>
+</div>
+
 <!-- EXPORT MENU MODAL -->
 <div id="export-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);">
   <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-xl);padding:28px;width:90%;max-width:400px;">
@@ -567,6 +592,7 @@ select.onb-input option{background:var(--bg2);}
       <div style="display:flex;gap:6px;align-items:center;">
         <button class="btn btn-accent" onclick="showExportMenu()" id="btn-export" title="Exportar dados">↓ Exportar</button>
         <button class="btn" onclick="triggerImport()" title="Importar backup JSON" style="background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);">↑ Importar</button>
+        <button class="btn" onclick="openApiKeyModal()" id="btn-apikey" title="Gerenciar chave da API" style="background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);">🔑 Chave API</button>
         <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importJSON(event)">
       </div>
       <button class="config-btn" onclick="resetApp()" title="Resetar configurações">⚙ Resetar</button>
@@ -916,7 +942,11 @@ async function processarCurriculo(){
     setTimeout(()=>iniciarApp(),800);
   }catch(e){
     statusEl.textContent='Erro ao processar. Verifique sua chave de API e tente novamente.';
-    document.getElementById('step-4').innerHTML=`<div class="onb-reading"><div class="onb-reading-title" style="color:var(--red)">Erro ao processar</div><div class="onb-reading-sub">Verifique sua chave de API Anthropic e tente novamente.</div><button class="onb-btn" onclick="location.reload()" style="margin-top:20px;">Tentar novamente</button></div>`;
+    document.getElementById('step-4').innerHTML=`<div class="onb-reading">
+      <div class="onb-reading-title" style="color:var(--red)">Erro ao processar</div>
+      <div class="onb-reading-sub">Verifique se sua chave da API Anthropic está correta e possui créditos disponíveis.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent2);">Verificar chave ↗</a> &nbsp;·&nbsp; <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--accent2);">Ver créditos ↗</a></div>
+      <button class="onb-btn" onclick="location.reload()" style="margin-top:20px;">Tentar novamente</button>
+    </div>`; 
   }
 }
 
@@ -928,14 +958,27 @@ function iniciarApp(){
   setTimeout(()=>{
     cel.style.display='none';
     document.getElementById('app').style.display='flex';
-  document.getElementById('header-user').textContent=USER_NAME+' · '+USER_AREA;
-  document.getElementById('agente-hero-sub').textContent=`Análise inteligente do perfil de ${USER_NAME} como ${USER_AREA}`;
+    document.getElementById('header-user').textContent=USER_NAME+' · '+USER_AREA;
+    document.getElementById('agente-hero-sub').textContent=`Análise inteligente do perfil de ${USER_NAME} como ${USER_AREA}`;
     gerarTermos();
     const sv=localStorage.getItem('jtp-vagas');
-  const sc=localStorage.getItem('jtp-contatos');
+    const sc=localStorage.getItem('jtp-contatos');
     vagas=sv?JSON.parse(sv):[];
     contatos=sc?JSON.parse(sc):[];
     render();
+    updateApiKeyBadge();
+    // Se não tem chave configurada, abre modal automaticamente
+    const hasKey = !!(API_KEY || localStorage.getItem('jtp-apikey'));
+    if(!hasKey){
+      setTimeout(()=>{
+        openApiKeyModal();
+        const status = document.getElementById('apikey-modal-status');
+        if(status){
+          status.textContent = '⚠ Configure sua chave para usar a IA';
+          status.style.color = 'var(--amber)';
+        }
+      }, 600);
+    }
   }, 2800);
 }
 
@@ -944,8 +987,8 @@ function checkSavedSession(){
   const curriculo=localStorage.getItem('jtp-curriculo');
   const apikey=localStorage.getItem('jtp-apikey');
   const area=localStorage.getItem('jtp-area');
-  if(nome&&curriculo&&apikey){
-    USER_NAME=nome; CURRICULO=curriculo; API_KEY=apikey; USER_AREA=area||'';
+  if(nome&&curriculo){
+    USER_NAME=nome; CURRICULO=curriculo; API_KEY=apikey||''; USER_AREA=area||'';
     iniciarApp();
   }
 }
@@ -1283,6 +1326,89 @@ function abrirLink(){
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+
+// ── API KEY MANAGEMENT ────────────────────────────────────────
+function openApiKeyModal(){
+  const modal = document.getElementById('apikey-modal');
+  const input = document.getElementById('modal-apikey');
+  const status = document.getElementById('apikey-modal-status');
+  // Pre-fill with current key if exists
+  input.value = API_KEY || localStorage.getItem('jtp-apikey') || '';
+  status.textContent = API_KEY ? '✓ Chave carregada' : '';
+  status.style.color = 'var(--accent)';
+  modal.style.display = 'flex';
+  setTimeout(()=> input.focus(), 100);
+}
+
+function closeApiKeyModal(){
+  document.getElementById('apikey-modal').style.display = 'none';
+}
+
+function toggleApiKeyVisibility(){
+  const input = document.getElementById('modal-apikey');
+  const btn = document.getElementById('toggle-apikey-btn');
+  if(input.type === 'password'){
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+function saveApiKey(){
+  const input = document.getElementById('modal-apikey');
+  const status = document.getElementById('apikey-modal-status');
+  const key = input.value.trim();
+  if(!key){
+    status.textContent = 'Insira uma chave válida.';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  if(!key.startsWith('sk-ant-')){
+    status.textContent = 'A chave deve começar com sk-ant-';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  API_KEY = key;
+  localStorage.setItem('jtp-apikey', key);
+  status.textContent = '✓ Chave salva com sucesso!';
+  status.style.color = 'var(--accent)';
+  // Update btn indicator
+  updateApiKeyBadge();
+  setTimeout(()=> closeApiKeyModal(), 1200);
+}
+
+function clearApiKey(){
+  if(!confirm('Remover a chave salva? Você precisará inserir novamente para usar a IA.')) return;
+  API_KEY = '';
+  localStorage.removeItem('jtp-apikey');
+  document.getElementById('modal-apikey').value = '';
+  const status = document.getElementById('apikey-modal-status');
+  status.textContent = 'Chave removida.';
+  status.style.color = 'var(--text2)';
+  updateApiKeyBadge();
+}
+
+function updateApiKeyBadge(){
+  const btn = document.getElementById('btn-apikey');
+  if(!btn) return;
+  const hasKey = !!(API_KEY || localStorage.getItem('jtp-apikey'));
+  btn.style.borderColor = hasKey ? 'var(--accent2)' : 'var(--red)';
+  btn.style.color = hasKey ? 'var(--accent)' : 'var(--red)';
+  btn.title = hasKey ? 'Chave da API configurada ✓' : '⚠ Chave da API não configurada';
+}
+
+// Close modal on backdrop click
+document.getElementById('apikey-modal').addEventListener('click', function(e){
+  if(e.target === this) closeApiKeyModal();
+});
+
+// Enter key saves
+document.getElementById('modal-apikey').addEventListener('keydown', function(e){
+  if(e.key === 'Enter') saveApiKey();
+});
+
 // ── EXPORT / IMPORT ─────────────────────────────────────────
 
 function showExportMenu(){
@@ -1475,6 +1601,7 @@ function restoreFromOnboarding(event){
         if(savedKey) API_KEY = savedKey;
         const savedCv = localStorage.getItem('jtp-curriculo');
         if(savedCv) CURRICULO = savedCv;
+        // Enter app even without API key — modal will prompt
         iniciarApp();
       }, 1800);
     } catch(err){
@@ -1497,6 +1624,7 @@ function restoreFromOnboarding(event){
 // INIT
 checkSavedSession();
 updateBackupBadge();
+setTimeout(updateApiKeyBadge, 100);
 </script>
 </body>
 </html>
